@@ -50,8 +50,12 @@ function initSocketServer(httpServer) {
       const memory = await queryMemory({
         queryVector: vectors,
         limit: 3,
-        metadata: {},
+        metadata: {
+          user:socket.user._id
+        },
       });
+
+      console.log(memory);
 
       // Save user message vector in Pinecone
       await createMemory({
@@ -64,8 +68,6 @@ function initSocketServer(httpServer) {
         },
       });
 
-      console.log(memory);
-
       // Get last 20 messages from MongoDB
       const chatHistory = (
         await messageModel
@@ -77,43 +79,61 @@ function initSocketServer(httpServer) {
           .lean()
       ).reverse();
 
-      // Send chat history to Gemini and get reply
-      const response = await aiService.generateResponse(
-        chatHistory.map((item) => {
-          return {
-            role: item.role,
-            parts: [{ text: item.content }],
-          };
-        }),
-      );
-
-      // Save AI reply in MongoDB
-      const responseMessage = await messageModel.create({
-        chat: messagePayLoad.chat,
-        user: socket.user._id,
-        content: response,
-        role: "model",
+      const stm = chatHistory.map((item) => {
+        return {
+          role: item.role,
+          parts: [{ text: item.content }],
+        };
       });
 
-      // Convert AI reply text into vector (numbers)
-      const responseVectors = await aiService.generateVector(response);
+      const ltm = [
+        {
+          role: "user",
+          parts: [
+            {
+              text: `
+              these are some previous messages from the chat, use them to generate a response
+              ${memory.map((item) => item.metadata.text).join("\n")}
+          `,
+            },
+          ],
+        },
+      ];
 
-      // Save AI reply vector in Pinecone
-      await createMemory({
-        vectors: responseVectors,
-        messageId: responseMessage._id,
-        metadata: {
+     console.log(ltm[0])
+     console.log(stm)
+
+      
+        // Send chat history to Gemini and get reply
+        const response = await aiService.generateResponse([...ltm, ...stm]);
+
+        // Save AI reply in MongoDB
+        const responseMessage = await messageModel.create({
           chat: messagePayLoad.chat,
           user: socket.user._id,
-          text: response,
-        },
-      });
+          content: response,
+          role: "model",
+        });
 
-      // Send AI reply to user
-      socket.emit("ai-response", {
-        content: response,
-        chat: messagePayLoad.chat,
-      });
+        // Convert AI reply text into vector (numbers)
+        const responseVectors = await aiService.generateVector(response);
+
+        // Save AI reply vector in Pinecone
+        await createMemory({
+          vectors: responseVectors,
+          messageId: responseMessage._id,
+          metadata: {
+            chat: messagePayLoad.chat,
+            user: socket.user._id,
+            text: response,
+          },
+        });
+
+         // Send AI reply to user
+        socket.emit("ai-response", {
+          content: response,
+          chat: messagePayLoad.chat,
+        });
     });
   });
 }
