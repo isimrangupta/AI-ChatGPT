@@ -2,6 +2,8 @@ const { GoogleGenAI } = require("@google/genai");
 
 const ai = new GoogleGenAI({});
 
+
+// Get reply from Gemini AI
 async function generateResponse(content) {
   const response = await ai.models.generateContent({
     model: "gemini-3.5-flash",
@@ -10,7 +12,7 @@ async function generateResponse(content) {
   return response.text;
 }
 
-
+// Convert text into vector (numbers)
 async function generateVector(content) {
   const response = await ai.models.embedContent({
     model: "gemini-embedding-2",

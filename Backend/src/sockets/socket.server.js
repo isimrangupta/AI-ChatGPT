@@ -35,6 +35,7 @@ function initSocketServer(httpServer) {
     socket.on("ai-message", async (messagePayLoad) => {
       console.log(messagePayLoad); /* {chat, content} */
 
+      // Save user message in MongoDB
       const message = await messageModel.create({
         chat: messagePayLoad.chat,
         user: socket.user._id,
@@ -42,14 +43,17 @@ function initSocketServer(httpServer) {
         role: "user",
       });
 
+      // Convert user message text into vector (numbers)
       const vectors = await aiService.generateVector(messagePayLoad.content);
 
+      // Find similar messages from Pinecone
       const memory = await queryMemory({
         queryVector: vectors,
         limit: 3,
         metadata: {},
       });
 
+      // Save user message vector in Pinecone
       await createMemory({
         vectors,
         messageId: message._id,
@@ -60,8 +64,9 @@ function initSocketServer(httpServer) {
         },
       });
 
-      console.log(memory)
+      console.log(memory);
 
+      // Get last 20 messages from MongoDB
       const chatHistory = (
         await messageModel
           .find({
@@ -72,6 +77,7 @@ function initSocketServer(httpServer) {
           .lean()
       ).reverse();
 
+      // Send chat history to Gemini and get reply
       const response = await aiService.generateResponse(
         chatHistory.map((item) => {
           return {
@@ -81,6 +87,7 @@ function initSocketServer(httpServer) {
         }),
       );
 
+      // Save AI reply in MongoDB
       const responseMessage = await messageModel.create({
         chat: messagePayLoad.chat,
         user: socket.user._id,
@@ -88,8 +95,10 @@ function initSocketServer(httpServer) {
         role: "model",
       });
 
+      // Convert AI reply text into vector (numbers)
       const responseVectors = await aiService.generateVector(response);
 
+      // Save AI reply vector in Pinecone
       await createMemory({
         vectors: responseVectors,
         messageId: responseMessage._id,
@@ -100,6 +109,7 @@ function initSocketServer(httpServer) {
         },
       });
 
+      // Send AI reply to user
       socket.emit("ai-response", {
         content: response,
         chat: messagePayLoad.chat,
