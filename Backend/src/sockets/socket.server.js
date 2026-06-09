@@ -35,27 +35,18 @@ function initSocketServer(httpServer) {
     socket.on("ai-message", async (messagePayLoad) => {
       console.log(messagePayLoad); /* {chat, content} */
 
-      // Save user message in MongoDB
-      const message = await messageModel.create({
-        chat: messagePayLoad.chat,
-        user: socket.user._id,
-        content: messagePayLoad.content,
-        role: "user",
-      });
+      const [message, vectors] = await Promise.all([
+        // Save user message in MongoDB
+        messageModel.create({
+          chat: messagePayLoad.chat,
+          user: socket.user._id,
+          content: messagePayLoad.content,
+          role: "user",
+        }),
 
-      // Convert user message text into vector (numbers)
-      const vectors = await aiService.generateVector(messagePayLoad.content);
-
-      // Find similar messages from Pinecone
-      const memory = await queryMemory({
-        queryVector: vectors,
-        limit: 3,
-        metadata: {
-          user: { $eq: socket.user._id.toString() }
-        },
-      });
-
-      console.log(memory);
+        // Convert user message text into vector (numbers)
+        aiService.generateVector(messagePayLoad.content),
+      ]);
 
       // Save user message vector in Pinecone
       await createMemory({
@@ -68,16 +59,26 @@ function initSocketServer(httpServer) {
         },
       });
 
-      // Get last 20 messages from MongoDB
-      const chatHistory = (
-        await messageModel
+      const [memory, chatHistory] = await Promise.all([
+        // Find similar messages from Pinecone
+        queryMemory({
+          queryVector: vectors,
+          limit: 3,
+          metadata: {
+            user: { $eq: socket.user._id.toString() },
+          },
+        }),
+
+        // Get last 20 messages from MongoDB
+        messageModel
           .find({
             chat: messagePayLoad.chat,
           })
           .sort({ createdAt: -1 })
           .limit(20)
           .lean()
-      ).reverse();
+          .then((messages) => messages.reverse()),
+      ]);
 
       const stm = chatHistory.map((item) => {
         return {
@@ -100,40 +101,38 @@ function initSocketServer(httpServer) {
         },
       ];
 
-     console.log(ltm[0])
-     console.log(stm)
+      // Send chat history to Gemini and get reply
+      const response = await aiService.generateResponse([...ltm, ...stm]);
 
-      
-        // Send chat history to Gemini and get reply
-        const response = await aiService.generateResponse([...ltm, ...stm]);
+      // Send AI reply to user
+      socket.emit("ai-response", {
+        content: response,
+        chat: messagePayLoad.chat,
+      });
 
+      const [responseMessage, responseVectors] = await Promise.all([
         // Save AI reply in MongoDB
-        const responseMessage = await messageModel.create({
+        messageModel.create({
           chat: messagePayLoad.chat,
           user: socket.user._id,
           content: response,
           role: "model",
-        });
+        }),
 
         // Convert AI reply text into vector (numbers)
-        const responseVectors = await aiService.generateVector(response);
+        aiService.generateVector(response),
+      ]);
 
-        // Save AI reply vector in Pinecone
-        await createMemory({
-          vectors: responseVectors,
-          messageId: responseMessage._id,
-          metadata: {
-            chat: messagePayLoad.chat,
-            user: socket.user._id,
-            text: response,
-          },
-        });
-
-         // Send AI reply to user
-        socket.emit("ai-response", {
-          content: response,
+      // Save AI reply vector in Pinecone
+      await createMemory({
+        vectors: responseVectors,
+        messageId: responseMessage._id,
+        metadata: {
           chat: messagePayLoad.chat,
-        });
+          user: socket.user._id,
+          text: response,
+        },
+      });
     });
   });
 }
