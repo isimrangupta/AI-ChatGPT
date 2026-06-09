@@ -51,7 +51,7 @@ function initSocketServer(httpServer) {
         queryVector: vectors,
         limit: 3,
         metadata: {
-          user:socket.user._id
+          user: { $eq: socket.user._id.toString() }
         },
       });
 
