@@ -1,3 +1,4 @@
+const cors = require("cors")
 const express = require("express")
 const cookieParser = require("cookie-parser")
 
@@ -7,6 +8,14 @@ const chatRoutes = require("./routes/chat.routes")
 
 
 const app = express();
+
+/* CORS Middleware  */
+app.use(
+    cors({
+        origin: "http://localhost:5173",
+        credentials:true,
+    })
+)
 
 /* Using Middlewares */
 app.use(express.json());
