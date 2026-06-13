@@ -12,7 +12,7 @@ const app = express();
 /* CORS Middleware  */
 app.use(
     cors({
-        origin: true,
+        origin: "https://ai-chat-gpt-frontend.vercel.app",
         credentials:true,
     })
 )

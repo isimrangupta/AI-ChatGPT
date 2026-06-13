@@ -9,7 +9,7 @@ const { createMemory, queryMemory } = require("../services/vector.service");
 function initSocketServer(httpServer) {
   const io = new Server(httpServer, {
   cors: {
-    origin: true,
+    origin: "https://ai-chat-gpt-frontend.vercel.app",
     credentials: true,
   },
 });
