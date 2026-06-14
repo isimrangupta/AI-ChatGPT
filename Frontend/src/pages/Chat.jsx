@@ -80,15 +80,17 @@ export default function Chat() {
 
     function handleAiResponse(data) {
       setIsTyping(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          _id: Date.now().toString(),
-          role: "model",
-          content: data.content,
-          chat: data.chat,
-        },
-      ]);
+      if (data.chat === activeChat?._id) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            _id: Date.now().toString(),
+            role: "model",
+            content: data.content,
+            chat: data.chat,
+          },
+        ]);
+      }
     }
 
     socket.on("ai-response", handleAiResponse);
