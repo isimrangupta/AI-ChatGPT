@@ -8,23 +8,25 @@ const { createMemory, queryMemory } = require("../services/vector.service");
 
 function initSocketServer(httpServer) {
   const io = new Server(httpServer, {
-  cors: {
-    origin: "https://ai-chat-gpt-frontend.vercel.app",
-    credentials: true,
-  },
-});
+    cors: {
+      origin: "https://ai-chat-gpt-frontend.vercel.app",
+      credentials: true,
+    },
+  });
 
   io.use(async (socket, next) => {
     const cookies = cookie.parse(socket.handshake.headers?.cookie || "");
 
-    console.log("socket connection cookies:", cookies);
+    // Get token either from cookies or from the auth object
+    const token = cookies.token || socket.handshake.auth?.token;
 
-    if (!cookies.token) {
+    // Reject connection if no token is provided
+    if (!token) {
       return next(new Error("Authentication error: No token provided"));
     }
 
     try {
-      const decoded = jwt.verify(cookies.token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       const user = await userModel.findById(decoded.id);
 

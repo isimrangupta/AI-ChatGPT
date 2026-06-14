@@ -17,8 +17,10 @@ export function SocketProvider({ children }) {
       return;
     }
 
+        const token = localStorage.getItem("token"); // add token
     const socket = io(import.meta.env.VITE_API_URL, {
       withCredentials: true,
+      auth: { token },
     });
 
     socketRef.current = socket;

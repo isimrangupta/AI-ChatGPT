@@ -24,6 +24,7 @@ export function AuthProvider({ children }) {
     });
     setUser(res.data.user);
     localStorage.setItem("user", JSON.stringify(res.data.user));
+      localStorage.setItem("token", res.data.token); // ← add
     return res.data;
   }
 
@@ -32,6 +33,7 @@ export function AuthProvider({ children }) {
     const res = await api.post("/api/auth/login", { email, password });
     setUser(res.data.user);
     localStorage.setItem("user", JSON.stringify(res.data.user));
+     localStorage.setItem("token", res.data.token); // ← add
     return res.data;
   }
 
@@ -39,6 +41,7 @@ export function AuthProvider({ children }) {
   function logout() {
     setUser(null);
     localStorage.removeItem("user");
+      localStorage.removeItem("token"); // ← add
   }
 
   return (
